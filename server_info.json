@@ -1,14 +1,12 @@
 {
     "STATUS":"test",
-    "WAS_SERVER":"150.183.252.61:3000",
-    "TEST_SERVER":"150.183.111.200:3456",
+    "WAS_SERVER":"SERVER_INFO",
     "DB":{
         "host":"127.0.0.1",     
         "port":3306,     
-        "user":"mykoni",      
-        "passwd":"kisti123",    
-        "db":"konidb",   
+        "user":"USERINFO",      
+        "passwd":"PASSWORD_HERE",    
+        "db":"DATABASEINFO",   
         "charset":"utf8"
-    },
-    "githubpw":"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"
+    }
 }
