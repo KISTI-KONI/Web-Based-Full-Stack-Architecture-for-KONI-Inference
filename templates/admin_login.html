@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/static/img/favicon.ico">
+
+    <title>KONI ADMIN</title>
+    <link rel="stylesheet" href="{{url_for('static',filename='style/toastr.min.css')}}">
+
+    <script src="https://kit.fontawesome.com/43825b270f.js" crossorigin="anonymous"></script>
+    <script src="{{url_for('static',filename='js/jquery.js')}}"></script>
+    <script src="{{url_for('static',filename='js/toastr.min.js')}}"></script>
+
+</head>
+
+<body>
+    <div class="container">        
+        <div class="login-box">
+            <div class=".input-box">
+                <label for="id">ID</label>
+                <input type="text" id="id">
+            </div>
+            <div class=".input-box">
+                <label for="password">PW</label>
+                <input type="password" id="password">
+            </div>
+            <div class="confirm">
+                <a href="" onclick="login()">Login</a>
+            </div>
+        </div>
+    </div>
+</body>
+<style>
+    body{
+       
+        margin:0;
+    }
+    .container{
+        width: 100vw;
+        height: 100vh;
+        padding : 25% 0;
+    }
+    .login-box{
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 560px;
+        height: 360px;
+        margin:0 auto;
+        border: 1px solid black;
+        padding: 100px;
+        box-sizing: border-box;
+    }
+    .login-box div{
+        height:50px;
+    }
+    .input-box{
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+    }
+    .confirm a {
+        border:1px solid orange;
+        background: orange;
+        text-decoration: none;
+        color: aliceblue;
+        padding: 5px;
+    }
+</style>
+<script>
+    const site = "http://203.250.214.35";
+
+    function login(){
+        let pd = {
+            'id': $('#id').val(),
+            'password':$('#password').val()
+        }
+        $.ajax({
+            type:'post',
+            url:site+'/alogin',
+            data:pd,
+            success:function(res){
+                if(res == '200')
+                    location.reload();
+                else
+                    toastr.error('Failed to login.')
+            }
+        })
+    }
+</script>
+</html>
