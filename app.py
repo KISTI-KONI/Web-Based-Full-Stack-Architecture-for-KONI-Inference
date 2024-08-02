@@ -207,7 +207,6 @@ def pinit():
             docs = fets
         else :
             status='newbie'
-            # output = generateOutput(db,cursor,str(ins[2]),[str(ins[1]),page_id,str(ins[0]),now])
             bias = 0
             comment = ''
             output='newbie'

@@ -1,0 +1,13 @@
+{
+    "STATUS":"test",
+    "WAS_SERVER":"150.183.252.61:3000",
+    "TEST_SERVER":"150.183.111.200:3456",
+    "DB":{
+        "host":"127.0.0.1",     
+        "port":3306,     
+        "user":"mykoni",      
+        "passwd":"kisti123",    
+        "db":"konidb",   
+        "charset":"utf8"
+    }
+}
