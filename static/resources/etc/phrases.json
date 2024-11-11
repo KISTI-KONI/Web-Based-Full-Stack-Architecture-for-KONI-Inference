@@ -1,0 +1,24 @@
+{
+    "contents":[
+       {
+            "phrase": "안녕하세요.",
+            "icon":"fa-solid fa-magic-wand-sparkles",
+            "color":"rgb(255, 240, 23)"
+       },
+       {
+            "phrase": "너의 이름은 뭐니?",
+            "icon":"fa-solid fa-question",
+            "color":"rgb(143, 255, 255)"
+       },
+       {
+            "phrase": "KISTI에 대해서 설명해줘.",
+            "icon":"fa-solid fa-computer",
+            "color":"#ab68ff"
+       },
+       {
+            "phrase": "베르누이의 정리에 대해서 수식과 함께 설명해주고, 이를 증빙하기 위한 실험계획을 세워줘.",
+            "icon":"fa-brands fa-rebel",
+            "color":"#ce3212"
+       }
+    ]
+}

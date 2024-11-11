@@ -107,11 +107,16 @@ $(document).ready(function(){
             }
         });
 	}else{
-        
-        setExample(1,'fa-solid fa-magic-wand-sparkles','rgb(255, 240, 23)','서울로 1박 2일 출장을 가면, 숙박비는 얼마까지 사용 가능하나요?')
-        setExample(2,'fa-solid fa-question','rgb(143, 255, 255)','배우자가 출산할 경우 휴가는 최대 몇 일까지 사용 가능하나요?')
-        setExample(3,'fa-solid fa-computer','#ab68ff','전문가 자문비의 원천징수 기준 금액을 알려줘.')
-        setExample(4,'fa-brands fa-rebel','#ce3212','소액물품구매, 소액용역, 소액공사의 경우 계약부서를 거치지 않고 수요부서에서 직접 계약 처리할 수 있는 상한 금액은 각각 얼마인가요?')
+        fetch("/static/resources/etc/phrases.json")
+        .then((response) => {
+            return response.json();
+        })
+        .then(json=>{
+            setExample(1,json['contents'][0]['icon'],json['contents'][0]['color'],json['contents'][0]['phrase'])
+            setExample(2,json['contents'][1]['icon'],json['contents'][1]['color'],json['contents'][1]['phrase'])
+            setExample(3,json['contents'][2]['icon'],json['contents'][2]['color'],json['contents'][2]['phrase'])
+            setExample(4,json['contents'][3]['icon'],json['contents'][3]['color'],json['contents'][3]['phrase'])
+        });
 	}
 	$('.home').click(function(){
 		location.href='/';
