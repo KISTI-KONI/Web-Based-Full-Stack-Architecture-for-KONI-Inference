@@ -4,16 +4,17 @@ var order = 1;
 var is_noob = false;
 /* 전역 변수 */
 var prevent = false;
-const site = "http://203.250.214.35";
+const site = "http://150.183.111.200:3457";
 $(document).ready(function(){
 	const url =new URL( window.location.href);
 	const path = url.pathname;
     const trigger = path.split('/');
     $.ajax({
         type:"post",
-        url:site+"/init",
+        url:"/init",
         success:function(res){
             uid = res['uid'];
+            console.log(uid)
             setSidebar(res['side']);
         }
     });
@@ -25,7 +26,7 @@ $(document).ready(function(){
         page = trigger[2]
         $.ajax({
             type:"post",
-            url:site+"/page_init",
+            url:"/page_init",
             data:{
                 'page':page
             },
@@ -80,26 +81,26 @@ $(document).ready(function(){
                     }
                     index++;
                 }
-                order = index;
+                order = index-1;
                 if(res['status'] == 'newbie'){
                     
                     $.ajax({
                         type:"post",
-                        url:site+"/generate",
+                        url:"/generate",
                         data:{
                             'page':page,
-                            'index':order-1
+                            'index':order
                         },
                         success:function(res){
                             
                             $('.loader').css('display','none');
                             if(res[1] == 'error'){
                                 prevent = true;
-                                $('#kout'+(order-1)).find('p').append('<a href="javascript:location.reload()">'+res[0]+'</a>')
+                                $('#kout'+order).find('p').append('<a href="javascript:location.reload()">'+res[0]+'</a>')
                             }
                             else if(res[1] !='error'){
-                                textAnimation('#kout'+(order-1),res[0]);
-                                setRetrieval(order-1,res[1])
+                                textAnimation('#kout'+order,res[0]);
+                                setRetrieval(order,res[1])
 				            }
                         }
                     });
@@ -146,7 +147,7 @@ $(document).ready(function(){
     $('.init-ex').click(function(e){
         let ex = $(this).attr('id');
         let text =$('#'+ex).children('.init-ex-text').text();
-        let n_text = '!' + text;
+        let n_text = text;
         submit(n_text)
     });
 
@@ -532,3 +533,12 @@ function typing(tag,text){
 }
 
 
+/*./usr/lib/python3/dist-packages/google/protobuf/service.py
+./usr/lib/python3/dist-packages/dbus/service.py
+./snap/core22/1663/usr/lib/python3/dist-packages/dbus/service.py
+./snap/core22/1621/usr/lib/python3/dist-packages/dbus/service.py
+./snap/gnome-3-38-2004/119/usr/lib/python3/dist-packages/dbus/service.py
+./snap/gnome-3-38-2004/143/usr/lib/python3/dist-packages/dbus/service.py
+./snap/gnome-42-2204/176/usr/lib/python3/dist-packages/dbus/service.py
+./opt/miniconda3/envs/intent_cls/lib/python3.8/site-packages/_bentoml_impl/worker/service.py
+./opt/miniconda3/envs/intent_cls/lib/python3.8/site-packages/bentoml/_internal/service/service.py

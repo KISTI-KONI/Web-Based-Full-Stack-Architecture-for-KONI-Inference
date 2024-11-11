@@ -1,5 +1,4 @@
-const site = "http://203.250.214.35/aapi";
-
+var site = "/aapi"
 const query = new URLSearchParams(location.search);
 let destination = ''
 $(document).ready(function(){

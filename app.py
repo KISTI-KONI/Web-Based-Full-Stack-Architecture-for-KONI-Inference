@@ -1,6 +1,10 @@
+import sys
+sys.path.append('./static/utils/')
+from utils import connect_db
+from utils import connect_serverinfo
+
 from flask import Flask,request,render_template,redirect,url_for,session
-from flask_cors import CORS, cross_origin
-import random as rd
+from flask_cors import CORS
 import glob,os,jsonlines,json,pymysql,datetime,time,random,string,requests,copy
 from pytz import timezone
 from langserve import RemoteRunnable
@@ -9,7 +13,8 @@ app = Flask(__name__)
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.secret_key = 'kisti-koni-largescaleairesearchgroup'
-
+DB_INFO = connect_db()
+SERVER_INFO = connect_serverinfo()
 def randomAscii():
     rand_str = ''
     for i in range(64):
@@ -31,15 +36,19 @@ def admin():
 def home():
     return render_template('index.html')
 
+@app.route('/page/<pid>',methods=['GET','POST'])
+def page(pid):  
+    return render_template('index.html')
+    
 @app.route('/init',methods=['POST'])
 def wru():
     db = pymysql.connect(
-        host='127.0.0.1',     
-        port=3306,     
-        user='mykoni',      
-        passwd='kisti123',    
-        db='konidb',   
-        charset='utf8'
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
     )
 
     cursor = db.cursor()
@@ -81,45 +90,29 @@ def wru():
     db.close()
     return {'side':res,'uid':myid}
 
-@app.route('/page/<pid>',methods=['GET','POST'])
-def page(pid):  
-    return render_template('index.html')
+INFERENCE_SERVER = 'http://150.183.252.61:3000'
+LOCAL_SERVER = 'http://127.0.0.1:4000'
 
 def generateOutput(db,cursor,text,settings):
     headers = {'Content-Type': 'application/json; charset=utf-8'}                                                                                                                                                                        
     print(text)
     docscount = 0
     try:
-        texts = requests.post('http://127.0.0.1:4000/classify',headers=headers,data=text)    
+        texts = requests.post(LOCAL_SERVER+'/classify',headers=headers,data=text)    
         output = ""                                                                                                                                    
         if texts.status_code == 200 :
             cls_res = texts.json()                                                                                                                                                                                                           
             if cls_res['intent'] == 'general' :                                                                                                                                                                                              
-                remote_runnable = RemoteRunnable('http://150.183.252.61:3000/multiturn')                                                                                                                                                     
-                output = remote_runnable.invoke({"question":cls_res['text'],"session_id":settings[1]}) #cls_res['text']                                                                                                                                             
+                remote_runnable = RemoteRunnable(INFERENCE_SERVER+'/singleturn')                                                                                                                                                     
+                output = remote_runnable.invoke({"question":text,"session_id":settings[1]}) #cls_res['text']                                                                                                                                             
                 docs=[]
     
             elif cls_res['intent'] == 'rag':                                                                                                                                                                          
-                remote_runnable = RemoteRunnable('http://150.183.252.61:3000/retrieval')                                                                                                                                                     
+                remote_runnable = RemoteRunnable(INFERENCE_SERVER+'/retrieval')                                                                                                                                                     
                 result = remote_runnable.invoke(cls_res['text'])                                                                                                                                                                             
                 docs = result['result_context']
                 output = result['result']
-                
-        
-        print(output)
-    # docs = [{
-    #     'page_content':'## 제40조(휴가수속) 직원이 휴가를 얻고자 할 때에는 사전에 소속부서장의 허가를 얻어 주관 부서 에 신청서를 제출하여야 한다.\n\n\n#',
-    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
-    # },{
-    #     'page_content':'## 1. 신청개요\n\n| 기 업 체 명    | 대           | 표   | 자   |',
-    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
-    # },{
-    #     'page_content':'## 제40조(휴가수속) 직원이 휴가를 얻고자 할 때에는 사전에 소속부서장의 허가를 얻어 주관 부서 에 신청서를 제출하여야 한다.\n\n\n#',
-    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
-    # }]
-    # output= 'test yes'
-    # time.sleep(1)
-
+            print(output)
         sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
         cursor.execute(sql,(output,settings[0],settings[1],settings[2],settings[3]))
         oid = cursor.lastrowid
@@ -140,7 +133,14 @@ def generateOutput(db,cursor,text,settings):
 
 @app.route('/generate',methods=['POST'])
 def generate():
-    db = pymysql.connect(host='127.0.0.1',port=3306,user='mykoni',passwd='kisti123',db='konidb',charset='utf8')
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+    )
     req = request.form.to_dict()
     cursor = db.cursor()
     page_id = req['page']
@@ -155,7 +155,14 @@ def generate():
 
 @app.route('/get_docs',methods=['POST'])
 def getDocs():
-    db = pymysql.connect(host='127.0.0.1',port=3306,user='mykoni',passwd='kisti123',db='konidb',charset='utf8')
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+    )
     req = request.form.to_dict()
     cursor = db.cursor()
     page_id = req['page']
@@ -173,12 +180,12 @@ def getDocs():
 @app.route('/page_init',methods=['POST'])
 def pinit():
     db = pymysql.connect(
-        host='127.0.0.1',     
-        port=3306,     
-        user='mykoni',      
-        passwd='kisti123',    
-        db='konidb',   
-        charset='utf8'
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
     )
     req = request.form.to_dict()
     cursor = db.cursor()
@@ -220,12 +227,12 @@ def pinit():
 @app.route('/submit',methods=['POST'])
 def submit():
     db = pymysql.connect(
-        host='127.0.0.1',     
-        port=3306,     
-        user='mykoni',      
-        passwd='kisti123',    
-        db='konidb',   
-        charset='utf8'
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
     )
     req = request.form.to_dict()
     cursor = db.cursor()
@@ -267,12 +274,12 @@ def submit():
 @app.route('/feedback',methods=['POST'])
 def feedback():
     db = pymysql.connect(
-        host='127.0.0.1',     
-        port=3306,     
-        user='mykoni',      
-        passwd='kisti123',    
-        db='konidb',   
-        charset='utf8'
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
     )
     req = request.form.to_dict()
     cursor = db.cursor()
@@ -337,12 +344,12 @@ def apage():
     if session['userid'] != 'admin':
         return {'status' : 400}
     db = pymysql.connect(
-        host='127.0.0.1',     
-        port=3306,     
-        user='mykoni',      
-        passwd='kisti123',    
-        db='konidb',   
-        charset='utf8',
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
         cursorclass=pymysql.cursors.DictCursor
     )
 
@@ -555,4 +562,18 @@ def strfDatetime(datetime):
     return f"{d[0]}월{d[1]}일 {str(int(t[0]))}시{t[1]}분"
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0',port=3456,debug=True) 
+    app.run(host='0.0.0.0',port=3457,debug=True) 
+
+
+    # docs = [{
+    #     'page_content':'## 제40조(휴가수속) 직원이 휴가를 얻고자 할 때에는 사전에 소속부서장의 허가를 얻어 주관 부서 에 신청서를 제출하여야 한다.\n\n\n#',
+    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
+    # },{
+    #     'page_content':'## 1. 신청개요\n\n| 기 업 체 명    | 대           | 표   | 자   |',
+    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
+    # },{
+    #     'page_content':'## 제40조(휴가수속) 직원이 휴가를 얻고자 할 때에는 사전에 소속부서장의 허가를 얻어 주관 부서 에 신청서를 제출하여야 한다.\n\n\n#',
+    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
+    # }]
+    # output= 'test yes'
+    # time.sleep(1)

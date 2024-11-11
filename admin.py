@@ -1,3 +1,7 @@
+import sys
+sys.path.append('./static/utils/')
+from utils import connect_db
+
 from flask import Flask,request,session
 from flask_cors import CORS, cross_origin
 import random as rd
@@ -9,13 +13,14 @@ app.secret_key = 'kisti-koni-largescaleairesearchgroup'
 
 @app.route('/aapi/apage',methods=['POST'])
 def apage():
+    dbinfo = connect_db()
     db = pymysql.connect(
-        host='127.0.0.1',     
-        port=3306,     
-        user='mykoni',      
-        passwd='kisti123',    
-        db='konidb',   
-        charset='utf8',
+        host=dbinfo['host'],     
+        port=dbinfo['port'],     
+        user=dbinfo['user'],      
+        passwd=dbinfo['passwd'],    
+        db=dbinfo['db'],   
+        charset=dbinfo['charset'],
         cursorclass=pymysql.cursors.DictCursor
     )
 
