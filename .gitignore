@@ -1,2 +1,3 @@
 static/private/
 static/resources/files/
+__pycache__/

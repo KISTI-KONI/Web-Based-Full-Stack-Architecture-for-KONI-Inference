@@ -12,6 +12,16 @@ p{
     font-size : 18px;
     color:#111;
 }
+textarea{
+    font-family: 'SpoqaR';
+}
+textarea::placeholder{
+    font-family: 'SpoqaR';
+}
+.home {
+    font-size: 30px;
+    font-weight: bold;
+}
 .cursor-pointer {
 	cursor:pointer;
 }
