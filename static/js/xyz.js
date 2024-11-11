@@ -1,18 +1,13 @@
-var site = "/aapi"
+var site = ""
+
+
 const query = new URLSearchParams(location.search);
 let destination = ''
 $(document).ready(function(){
-    if (query.get('type')){
-        destination = query.get('type');
-    }else{
-        location.href = "?type=instruction"
-    }
-    if (query.get('retrieval')){
-        $('.input').children('input').val(query.get('retrieval'))
-    }
     let page = query.get('page')?query.get('page'):1;
     let retrieval = query.get('retrieval')?query.get('retrieval'):'';
     let pid = query.get('pid')?query.get('pid'):'';
+   
     if (page){
         let pd = {
             'type': query.get('type'),
@@ -22,39 +17,56 @@ $(document).ready(function(){
 
         }
 
-        $.ajax({
-            type:'post',
-            url:site+'/apage',
-            data:pd,
-            success:function(res){
-                let numofList = 10;
-                let numofPage = 5;
-                $('.content-title').html(res['title']+"("+res['inscount']+")");
-                if(pd['type']=='user'){
-                    setUser(res);
-                    pagenation($('.pagebox'),res['totcount'],numofList,numofPage,page);
-	            }else if(pd['type']=='instruction'){
-                    numofList = 1;
-                    setInstruction(res,page);
-                    pagenation($('.pagebox'),res['totcount'],numofList,numofPage,page);
-                }else if(pd['type']=='good' || pd['type']=='bad' || pd['type']=='comment'|| pd['type']=='rag'){
-                    $('.retrieval-box').css('display','none');
-                    setPage(res);
-                    pagenation($('.pagebox'),res['totcount'],numofList,numofPage,page);
-                }else if(pd['type']=='normal'){
-                    setPage(res,'normal');
-		            $('.pagebox').html('');
+        fetch("/static/private/server_info.json")
+        .then((response) => {
+            return response.json();
+        })
+        .then(json=>{
+            site = json['ADMIN_SERVER']
+            $.ajax({
+                type:'post',
+                url:site+'/apage',
+                data:pd,
+                success:function(res){
+                    let numofList = 10;
+                    let numofPage = 5;
+                    $('.content-title').html(res['title']+"("+res['inscount']+")");
+                    if(pd['type']=='user'){
+                        setUser(res);
+                        pagenation($('.pagebox'),res['totcount'],numofList,numofPage,page);
+                    }else if(pd['type']=='instruction'){
+                        numofList = 1;
+                        setInstruction(res,page);
+                        pagenation($('.pagebox'),res['totcount'],numofList,numofPage,page);
+                    }else if(pd['type']=='good' || pd['type']=='bad' || pd['type']=='comment'|| pd['type']=='rag'){
+                        $('.retrieval-box').css('display','none');
+                        setPage(res);
+                        pagenation($('.pagebox'),res['totcount'],numofList,numofPage,page);
+                    }else if(pd['type']=='normal'){
+                        setPage(res,'normal');
+                        $('.pagebox').html('');
+                        
+                    }
                     
                 }
-                
-            }
+            })
         })
+        if (query.get('type')){
+            destination = query.get('type');
+        }else{
+            location.href = "?type=instruction"
+        }
+        if (query.get('retrieval')){
+            $('.input').children('input').val(query.get('retrieval'))
+        }
+
+        
     } 
 
     $('.logout').click(()=>{
         $.ajax({
             type:'post',
-            url:site+'/alogout',
+            url:'/alogout',
             success:function(res){
                 if(res == '200')
                     location.reload();

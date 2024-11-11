@@ -4,7 +4,6 @@ var order = 1;
 var is_noob = false;
 /* 전역 변수 */
 var prevent = false;
-const site = "http://150.183.111.200:3457";
 $(document).ready(function(){
 	const url =new URL( window.location.href);
 	const path = url.pathname;
@@ -170,7 +169,7 @@ function actDocs(index){
     if (selector.find('.rag-result').css('display') == 'none'){
         $.ajax({
             type:"post",
-            url:site+"/get_docs",
+            url:"/get_docs",
             data:{
                 'page':page,
                 'order':index
@@ -324,7 +323,7 @@ function feedback(id,bias,comment=''){
     const page = trigger[2]
     $.ajax({
         type:"post",
-        url:site+"/feedback",
+        url:"/feedback",
         data:{
             'page':page,
             'bias':bias,
@@ -412,7 +411,7 @@ function submit(msg=''){
     setLoader(order);
 	$.ajax({
             type:"post",
-             url:site+"/submit",
+             url:"/submit",
              data:pd,
 	 	success:function(res){
             if(res['status']==300){
@@ -531,14 +530,3 @@ function typing(tag,text){
     }
     $('.scroll-box').scrollTop($('.scroll-box')[0].scrollHeight);
 }
-
-
-/*./usr/lib/python3/dist-packages/google/protobuf/service.py
-./usr/lib/python3/dist-packages/dbus/service.py
-./snap/core22/1663/usr/lib/python3/dist-packages/dbus/service.py
-./snap/core22/1621/usr/lib/python3/dist-packages/dbus/service.py
-./snap/gnome-3-38-2004/119/usr/lib/python3/dist-packages/dbus/service.py
-./snap/gnome-3-38-2004/143/usr/lib/python3/dist-packages/dbus/service.py
-./snap/gnome-42-2204/176/usr/lib/python3/dist-packages/dbus/service.py
-./opt/miniconda3/envs/intent_cls/lib/python3.8/site-packages/_bentoml_impl/worker/service.py
-./opt/miniconda3/envs/intent_cls/lib/python3.8/site-packages/bentoml/_internal/service/service.py

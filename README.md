@@ -14,6 +14,7 @@
     "STATUS": "{'test','inference'}", 
     "WAS_SERVER": "Local_WAS IP",
     "API_SERVER": "LLM model API Server",
+    "ADMIN_SERVER":"AJAX ADMIN URL", // use http://~~
     "INFERENCE_TYPE": "normal"
 }
 ```

@@ -1,11 +1,10 @@
 import sys
 sys.path.append('./static/utils/')
-from utils import connect_db
-from utils import connect_serverinfo
+from utils import connect_db,connect_serverinfo,randomAscii
 
 from flask import Flask,request,render_template,redirect,url_for,session
 from flask_cors import CORS
-import glob,os,jsonlines,json,pymysql,datetime,time,random,string,requests,copy
+import json,pymysql,datetime
 from pytz import timezone
 from langserve import RemoteRunnable
 from langchain_core.documents import Document
@@ -15,11 +14,7 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 app.secret_key = 'kisti-koni-largescaleairesearchgroup'
 DB_INFO = connect_db()
 SERVER_INFO = connect_serverinfo()
-def randomAscii():
-    rand_str = ''
-    for i in range(64):
-        rand_str += str(random.choice(string.ascii_uppercase + string.digits))
-    return rand_str
+
 
 @app.route('/',methods=['GET'])
 def init():
@@ -53,6 +48,8 @@ def wru():
 
     cursor = db.cursor()
     ip=request.headers.get('X-forwarded-for')
+    if not ip:
+        ip = '127.0.0.1'
     print(ip)
     sql='select id from user where ip = %s'
     cursor.execute(sql,ip)
@@ -90,39 +87,23 @@ def wru():
     db.close()
     return {'side':res,'uid':myid}
 
-INFERENCE_SERVER = 'http://150.183.252.61:3000'
-LOCAL_SERVER = 'http://127.0.0.1:4000'
+### API ###
+
+API_SERVER = SERVER_INFO['API_SERVER']
+WAS_SERVER = SERVER_INFO['WAS_SERVER']
 
 def generateOutput(db,cursor,text,settings):
     headers = {'Content-Type': 'application/json; charset=utf-8'}                                                                                                                                                                        
     print(text)
     docscount = 0
-    try:
-        texts = requests.post(LOCAL_SERVER+'/classify',headers=headers,data=text)    
-        output = ""                                                                                                                                    
-        if texts.status_code == 200 :
-            cls_res = texts.json()                                                                                                                                                                                                           
-            if cls_res['intent'] == 'general' :                                                                                                                                                                                              
-                remote_runnable = RemoteRunnable(INFERENCE_SERVER+'/singleturn')                                                                                                                                                     
-                output = remote_runnable.invoke({"question":text,"session_id":settings[1]}) #cls_res['text']                                                                                                                                             
-                docs=[]
-    
-            elif cls_res['intent'] == 'rag':                                                                                                                                                                          
-                remote_runnable = RemoteRunnable(INFERENCE_SERVER+'/retrieval')                                                                                                                                                     
-                result = remote_runnable.invoke(cls_res['text'])                                                                                                                                                                             
-                docs = result['result_context']
-                output = result['result']
-            print(output)
+    try:                                                                                                                                                                                            
+        remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')                                                                                                                                                     
+        output = remote_runnable.invoke({"question":text,"session_id":settings[1]})                                                                                                                                          
+        docs=[]
+        print(output)
         sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
         cursor.execute(sql,(output,settings[0],settings[1],settings[2],settings[3]))
         oid = cursor.lastrowid
-        if cls_res['intent'] == 'rag':
-            print(docs[0].dict())
-            for doc in docs :
-                docscount+=1
-                new_doc = doc.dict()
-                sql='insert into docs set oid=%s,contents=%s,field=%s,filename=%s,page=%s'
-                cursor.execute(sql,(oid,new_doc['page_content'],new_doc['metadata']['field'],new_doc['metadata']['filename'],new_doc['metadata']['page']))
         sql='update pages set title=%s,updated = %s where id = %s'
         cursor.execute(sql,(output[0:31],settings[3],settings[1]))
         db.commit()
@@ -332,6 +313,7 @@ def alogin():
         return '400'
     session['userid'] = 'admin'
     status = '200'
+    print(status)
     return status
 
 @app.route('/alogout',methods=['POST'])
@@ -339,241 +321,5 @@ def alogout():
     session.pop('userid', None)
     return '200'
 
-@app.route('/apage',methods=['POST'])
-def apage():
-    if session['userid'] != 'admin':
-        return {'status' : 400}
-    db = pymysql.connect(
-        host=DB_INFO['host'],     
-        port=DB_INFO['port'],     
-        user=DB_INFO['user'],      
-        passwd=DB_INFO['passwd'],    
-        db=DB_INFO['db'],   
-        charset=DB_INFO['charset'],
-        cursorclass=pymysql.cursors.DictCursor
-    )
-
-    cursor = db.cursor()
-    req = request.form.to_dict()
-    line = 10
-    title=''
-    etc=[]
-    results = []
-    dialogues=[]
-    if req['type'] == 'user':
-        title = '사용자 관리'
-        sql=f'select count(id) as count from user'
-        cursor.execute(sql)
-        fetone = cursor.fetchone()
-        count = fetone['count']
-        sql=f'select * from user limit {(int(req["page"])-1)*line},{line}'
-        cursor.execute(sql)
-        results = cursor.fetchall()
-        ins_counts = count
-
-    elif req['type'] == 'instruction':
-        if req['pid'] :
-            pid = req['pid']
-            count = 1
-            sql=f'select a.id as pid,b.ip,b.name,a.title,a.created,a.updated from pages a left join user b on a.uid = b.id where a.id = "{pid}"'
-            cursor.execute(sql)
-            fets = cursor.fetchone()
-            etc = []
-            for key,value in fets.items():
-                if key =='created' or key == 'updated':
-                    if value :
-                        value = strfDatetime(value)
-                if not value :
-                    value ='-'
-                fets[key]=value
-            etc.append(fets)
-            ins_count_sql = f'select count(id) as count from instructions  where pid = "{pid}"'
-        else:    
-            title = '대화 통계'
-            if req['retrieval'] == '':
-                sql=f'select count(id) as count from pages'
-                cursor.execute(sql)
-                fetone = cursor.fetchone()
-                count = fetone['count']
-                sql=f'select a.id as pid,b.ip,b.name,a.title,a.created,a.updated from pages a left join user b on a.uid = b.id order by a.created asc limit {(int(req["page"])-1)},1'
-                cursor.execute(sql)
-                fets = cursor.fetchone()
-                etc = []
-                for key,value in fets.items():
-                    if key =='created' or key == 'updated':
-                        if value :
-                            value = strfDatetime(value)
-                    if not value :
-                        value ='-'
-                    fets[key]=value
-                etc.append(fets)
-                ins_count_sql = "select count(id) as count from instructions"
-
-            else :
-                sql=f'select c.id from instructions a left join outputs b on a.id = b.iid left join pages c on c.id = a.pid where a.instruction like %s  order by c.created asc'
-                cursor.execute(sql,"%"+req['retrieval']+"%")
-                fetone = cursor.fetchall()
-                new_pids = []
-                for f in fetone:
-                    new_pids.append("'"+f['id']+"'")
-                pids = list(set(new_pids))
-                count = len(pids)
-                str_pids = ','.join(pids) if count != 0 else '""'
-                sql=f'select a.id as pid,b.ip,b.name,a.title,a.created,a.updated from pages a left join user b on a.uid = b.id where a.id in ({str_pids}) order by a.created  asc limit {(int(req["page"])-1)},1'
-                cursor.execute(sql)
-                fets = cursor.fetchone()
-                etc = []
-                if fets :
-                    for key,value in fets.items():
-                        if key =='created' or key == 'updated':
-                            if value :
-                                value = strfDatetime(value)
-                        if not value :
-                            value ='-'
-                        fets[key]=value
-                    etc.append(fets)
-                    ins_count_sql = f"select count(id) as count from instructions  where pid in ({str_pids})"
-                else :
-                    ins_count_sql = f"select count(id) as count from instructions  where pid in ('')"
-        cursor.execute(ins_count_sql)
-        counts = cursor.fetchone()
-        ins_counts = counts['count']
-        if fets :
-            sql=f'select a.id,a.instruction, b.output,c.bias,c.comment,d.contents,a.created,b.created as updated from instructions a left join outputs b on a.id = b.iid left join feedbacks c on b.id = c.oid left join docs d on b.id = d.oid where a.pid =%s order by a.iorder asc; '
-            cursor.execute(sql,fets['pid'])
-            page_dialogues = cursor.fetchall()          
-        
-            idx = 0
-            clk_id = ''
-            one_dialogue = {}
-            for dialogue in page_dialogues:
-                if clk_id != dialogue['id']:
-                    if idx != 0 :
-                        dialogues.append(one_dialogue)
-                    clk_id = dialogue['id']
-                    one_dialogue = {'id':clk_id}
-                    one_dialogue['instruction'] = dialogue['instruction']
-                    one_dialogue['output'] = dialogue['output'] if dialogue['output'] else '-'
-                    one_dialogue['bias'] = dialogue['bias']
-                    one_dialogue['comment'] = dialogue['comment'] if dialogue['comment'] else '-'
-                    one_dialogue['created'] = strfDatetime(dialogue['created'])
-                    one_dialogue['updated'] = strfDatetime(dialogue['updated'])
-                    one_dialogue['docs'] = []
-                one_dialogue['docs'].append(dialogue['contents'])
-                
-                idx+=1  
-            dialogues.append(one_dialogue)
-        else :
-            pass
-    elif req['type'] == 'good' or req['type'] == 'bad' or req['type'] == 'comment': 
-        if req['type'] == 'good':
-            title = '좋아요 대화'
-            where = 'where bias = 1'
-        elif req['type'] == 'bad':
-            title = '싫어요 대화'
-            where = 'where bias = -1'
-        elif req['type'] == 'comment':
-            title='피드백 코멘트'
-            where = 'where comment != ""'
-
-        sql=f'select count(a.id) as count from instructions a left join outputs b on a.id = b.iid left join feedbacks c on b.id = c.oid {where}'
-        cursor.execute(sql)
-        fetone = cursor.fetchone()
-        count = fetone['count']
-        sql=f'select a.id,a.pid,a.instruction, b.output,c.bias,c.comment,a.created,b.created as updated from instructions a left join outputs b on a.id = b.iid left join feedbacks c on b.id = c.oid {where} limit {(int(req["page"])-1)*line},{line}'
-        cursor.execute(sql)
-        page_dialogues = cursor.fetchall()
-        idx = 0
-        clk_id = ''
-        one_dialogue = {}
-        for dialogue in page_dialogues:
-            clk_id = dialogue['id']
-            one_dialogue = {'id':clk_id}
-            one_dialogue['pid'] = dialogue['pid']
-            one_dialogue['instruction'] = dialogue['instruction']
-            one_dialogue['output'] = dialogue['output'] if dialogue['output'] else '-'
-            one_dialogue['bias'] = dialogue['bias']
-            one_dialogue['comment'] = dialogue['comment'] if dialogue['comment'] else '-'
-            one_dialogue['created'] = strfDatetime(dialogue['created'])
-            one_dialogue['updated'] = strfDatetime(dialogue['updated'])
-            one_dialogue['docs'] = [None]
-            dialogues.append(one_dialogue)
-        ins_counts = count
-    elif req['type'] == 'normal' or req['type'] == 'rag':
-        if req['type'] == 'rag':
-            title = 'RAG 적용'
-            where = 'where contents is not null group by a.id'
-        elif req['type'] == 'normal':
-            title = 'RAG 미적용'
-            where = 'where contents is null group by a.id'
-        sql=f'select count(a.id) as count from instructions a left join outputs b on a.id = b.iid left join docs c on b.id = c.oid {where}'
-        cursor.execute(sql)
-        fetone = cursor.fetchone()
-        count = fetone['count']
-        sql=f'select a.id,a.pid,a.instruction, b.output,c.bias,c.comment,a.created,d.contents,b.created as updated from instructions a left join outputs b on a.id = b.iid left join feedbacks c on b.id = c.oid left join docs d on b.id = d.oid {where} limit {(int(req["page"])-1)*line},{line}'
-        cursor.execute(sql)
-        page_dialogues = cursor.fetchall()
-        idx = 0
-        clk_id = ''
-        one_dialogue = {}
-        for dialogue in page_dialogues:
-            if clk_id != dialogue['id']:
-                if idx != 0 :
-                    dialogues.append(one_dialogue)
-                clk_id = dialogue['id']
-                one_dialogue = {'id':clk_id}
-                one_dialogue['pid'] = dialogue['pid']
-                one_dialogue['instruction'] = dialogue['instruction']
-                one_dialogue['output'] = dialogue['output'] if dialogue['output'] else '-'
-                one_dialogue['bias'] = dialogue['bias']
-                one_dialogue['comment'] = dialogue['comment'] if dialogue['comment'] else '-'
-                one_dialogue['created'] = strfDatetime(dialogue['created'])
-                one_dialogue['updated'] = strfDatetime(dialogue['updated'])
-                one_dialogue['docs'] = []
-            one_dialogue['docs'].append(dialogue['contents'])
-            
-            idx+=1  
-        dialogues.append(one_dialogue)
-        ins_counts = count
-    keys = []
-    values = []
-    print(results)
-    for v in results :
-        ktmp = []
-        vtmp = []
-        for key,value in v.items():
-            if key =='created' or key == 'updated':
-                if value :
-                    value = strfDatetime(value)
-            if not value :
-                value ='-'
-            ktmp.append(key)
-            vtmp.append(value)
-
-        keys = copy.deepcopy(ktmp)
-        values.append(vtmp)
-    return {'title':title,'key':keys,'value':values,'totcount':count,'inscount':ins_counts,'etc':etc,'dialogues':dialogues}
-
-def strfDatetime(datetime):
-    if not datetime:
-        return '-'
-    d = str(datetime)[5:16].split(' ')[0].split('-')
-    t = str(datetime)[5:16].split(' ')[1].split(':')
-    return f"{d[0]}월{d[1]}일 {str(int(t[0]))}시{t[1]}분"
-
 if __name__ == "__main__":
-    app.run(host='0.0.0.0',port=3457,debug=True) 
-
-
-    # docs = [{
-    #     'page_content':'## 제40조(휴가수속) 직원이 휴가를 얻고자 할 때에는 사전에 소속부서장의 허가를 얻어 주관 부서 에 신청서를 제출하여야 한다.\n\n\n#',
-    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
-    # },{
-    #     'page_content':'## 1. 신청개요\n\n| 기 업 체 명    | 대           | 표   | 자   |',
-    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
-    # },{
-    #     'page_content':'## 제40조(휴가수속) 직원이 휴가를 얻고자 할 때에는 사전에 소속부서장의 허가를 얻어 주관 부서 에 신청서를 제출하여야 한다.\n\n\n#',
-    #     'metadata':{'field':'지침 및 법령','filename':'test.pdf','page':-1}
-    # }]
-    # output= 'test yes'
-    # time.sleep(1)
+    app.run(host='0.0.0.0',port=3457,debug=True)

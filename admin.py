@@ -1,6 +1,6 @@
 import sys
 sys.path.append('./static/utils/')
-from utils import connect_db
+from utils import connect_db,formatKoreanDatetime
 
 from flask import Flask,request,session
 from flask_cors import CORS, cross_origin
@@ -11,7 +11,7 @@ cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.secret_key = 'kisti-koni-largescaleairesearchgroup'
 
-@app.route('/aapi/apage',methods=['POST'])
+@app.route('/apage',methods=['POST'])
 def apage():
     dbinfo = connect_db()
     db = pymysql.connect(
@@ -53,7 +53,7 @@ def apage():
             for key,value in fets.items():
                 if key =='created' or key == 'updated':
                     if value :
-                        value = strfDatetime(value)
+                        value = formatKoreanDatetime(value)
                 if not value :
                     value ='-'
                 fets[key]=value
@@ -73,7 +73,7 @@ def apage():
                 for key,value in fets.items():
                     if key =='created' or key == 'updated':
                         if value :
-                            value = strfDatetime(value)
+                            value = formatKoreanDatetime(value)
                     if not value :
                         value ='-'
                     fets[key]=value
@@ -98,7 +98,7 @@ def apage():
                     for key,value in fets.items():
                         if key =='created' or key == 'updated':
                             if value :
-                                value = strfDatetime(value)
+                                value = formatKoreanDatetime(value)
                         if not value :
                             value ='-'
                         fets[key]=value
@@ -127,8 +127,8 @@ def apage():
                     one_dialogue['output'] = dialogue['output'] if dialogue['output'] else '-'
                     one_dialogue['bias'] = dialogue['bias']
                     one_dialogue['comment'] = dialogue['comment'] if dialogue['comment'] else '-'
-                    one_dialogue['created'] = strfDatetime(dialogue['created'])
-                    one_dialogue['updated'] = strfDatetime(dialogue['updated'])
+                    one_dialogue['created'] = formatKoreanDatetime(dialogue['created'])
+                    one_dialogue['updated'] = formatKoreanDatetime(dialogue['updated'])
                     one_dialogue['docs'] = []
                 one_dialogue['docs'].append(dialogue['contents'])
                 
@@ -165,8 +165,8 @@ def apage():
             one_dialogue['output'] = dialogue['output'] if dialogue['output'] else '-'
             one_dialogue['bias'] = dialogue['bias']
             one_dialogue['comment'] = dialogue['comment'] if dialogue['comment'] else '-'
-            one_dialogue['created'] = strfDatetime(dialogue['created'])
-            one_dialogue['updated'] = strfDatetime(dialogue['updated'])
+            one_dialogue['created'] = formatKoreanDatetime(dialogue['created'])
+            one_dialogue['updated'] = formatKoreanDatetime(dialogue['updated'])
             one_dialogue['docs'] = [None]
             dialogues.append(one_dialogue)
         ins_counts = count
@@ -191,8 +191,8 @@ def apage():
             one_dialogue['output'] = dialogue['output'] if dialogue['output'] else '-'
             one_dialogue['bias'] = dialogue['bias']
             one_dialogue['comment'] = dialogue['comment'] if dialogue['comment'] else '-'
-            one_dialogue['created'] = strfDatetime(dialogue['created'])
-            one_dialogue['updated'] = strfDatetime(dialogue['updated'])
+            one_dialogue['created'] = formatKoreanDatetime(dialogue['created'])
+            one_dialogue['updated'] = formatKoreanDatetime(dialogue['updated'])
             dialogues.append(one_dialogue)
             idx+=1  
         ins_counts = count
@@ -205,7 +205,7 @@ def apage():
         for key,value in v.items():
             if key =='created' or key == 'updated':
                 if value :
-                    value = strfDatetime(value)
+                    value = formatKoreanDatetime(value)
             if not value :
                 value ='-'
             ktmp.append(key)
@@ -215,7 +215,7 @@ def apage():
         values.append(vtmp)
     return {'title':title,'key':keys,'value':values,'totcount':count,'inscount':ins_counts,'etc':etc,'dialogues':dialogues}
 
-def strfDatetime(datetime):
+def formatKoreanDatetime(datetime):
     if not datetime:
         return '-'
     d = str(datetime)[5:16].split(' ')[0].split('-')
