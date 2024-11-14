@@ -182,12 +182,14 @@ def stream(page_id:str):
     fets = cursor.fetchone()
     text = fets['instruction']
     output=''
-    remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')                                                                                                                                                     
+    output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
+    # remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')                                                                                                                                                     
     def streaming(page_id):
         print(page_id+ " is start")
-        for p in  remote_runnable.stream({"query":text}):
+        # for p in  remote_runnable.stream({"query":text}):
+        for p in output_list:
             yield f'data:{p}\n\n'
-            time.sleep(0.005)
+            time.sleep(0.1)
         print(page_id +" is end") 
         yield("data:|end_text|\n\n")
     return Response(streaming(page_id),content_type="text/event-stream")
@@ -331,6 +333,140 @@ def submit():
     output,docs = generateOutput(db,cursor,req['question'],[req['uid'],page_id,myiid,now])
     db.close()
     return {'status':200,'data':output,'docs':docs}
+
+@app.route('/generate', methods=['POST'])
+async def generate():
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+    )
+    req = await request.form
+    cursor = db.cursor()
+    page_id = req['page']
+    iorder = req['index']
+    sql = 'select id, uid, instruction from instructions where pid = %s and iorder = %s'
+    cursor.execute(sql, (page_id, iorder))
+    fets = cursor.fetchone()
+    now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+    
+    output, docs = await generateOutput(db, cursor, str(fets[2]), [str(fets[1]), page_id, str(fets[0]), now])
+    return {'output': output, 'docs': docs}
+
+@app.route('/get_docs', methods=['POST'])
+async def getDocs():
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+    )
+    req = await request.form
+    cursor = db.cursor()
+    page_id = req['page']
+    iorder = req['order']
+    sql = 'select b.id from instructions a left join outputs b on a.id = b.iid where a.pid = %s and a.iorder = %s'
+    cursor.execute(sql, (page_id, iorder))
+    fets = cursor.fetchone()
+    oid = fets[0]
+    sql = 'select contents, field, filename, page from docs where oid = %s'
+    cursor.execute(sql, oid)
+    fets = cursor.fetchall()
+    docs = list(fets)
+    return {'docs': docs}
+
+@app.route('/page_init', methods=['POST'])
+async def pinit():
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+    )
+    req = await request.form
+    cursor = db.cursor()
+    page_id = req['page']
+    now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+    history = []
+
+    sql = 'select id, uid, instruction from instructions where pid = %s order by iorder asc'
+    cursor.execute(sql, page_id)
+    fets = cursor.fetchall()
+    status = 'history'
+    for ins in fets:
+        docs = []
+        sql = 'select a.output, b.bias, b.comment, a.id as oid from outputs a left join feedbacks b on a.id = b.oid where a.iid = %s'
+        cursor.execute(sql, str(ins[0]))
+        exist = cursor.rowcount
+        if exist != 0:
+            result = cursor.fetchone()
+            output = str(result[0])
+            bias = result[1]
+            comment = result[2]
+            sql = 'select contents, field, filename, page from docs where oid = %s'
+            cursor.execute(sql, str(result[3]))
+            fets = cursor.rowcount
+            docs = fets
+        else:
+            status = 'newbie'
+            bias = 0
+            comment = ''
+            output = 'newbie'
+
+        interact = {'instruction': str(ins[2]), 'output': output, 'feedback': {'bias': bias, 'comment': comment}, 'docs': docs}
+        history.append(interact)
+    db.close()
+    return {'status': status, 'data': history}
+
+@app.route('/submit', methods=['POST'])
+async def submit():
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+    )
+    req = await request.form
+    cursor = db.cursor()
+    page_id = req['page']
+    now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+    newbie = False
+    if not page_id:
+        newbie = True
+        while True:
+            page_id = randomAscii()        
+            sql = 'select id from pages where id = %s'
+            cursor.execute(sql, page_id)
+            pid = cursor.rowcount
+            if pid == 0:
+                break
+        sql = 'insert into pages set id = %s, uid = %s, created = %s, updated = %s'
+        cursor.execute(sql, (page_id, req['uid'], now, now))
+        db.commit()
+
+    text = req['question']
+    sql = 'insert into instructions set instruction = %s, uid = %s, pid = %s, iorder = %s, created = %s'
+    cursor.execute(sql, (text, req['uid'], page_id, req['order'], now))
+    db.commit()
+
+    myiid = cursor.lastrowid
+
+    if newbie:
+        db.close()
+        return {'status': 300, 'data': page_id}
+
+    output, docs = await generateOutput(db, cursor, req['question'], [req['uid'], page_id, myiid, now])
+    db.close()
+    return {'status': 200, 'data': output, 'docs': docs}
 
 @app.route('/feedback',methods=['POST'])
 def feedback():
