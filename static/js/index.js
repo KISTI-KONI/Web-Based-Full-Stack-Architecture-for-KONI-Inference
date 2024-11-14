@@ -13,7 +13,6 @@ $(document).ready(function(){
         url:"/init",
         success:function(res){
             uid = res['uid'];
-            console.log(uid)
             setSidebar(res['side']);
         }
     });
@@ -80,7 +79,7 @@ $(document).ready(function(){
                     }
                     index++;
                 }
-                order = index-1;
+                order = index;
                 if(res['status'] == 'newbie'){
                     
                     $.ajax({
@@ -137,7 +136,7 @@ $(document).ready(function(){
     })
 
     $('.btn-chat-info').click(function(e){
-        submit();
+        streaming();
     })
 
     $('.closed').click(()=>{
@@ -166,8 +165,9 @@ function setLoader(index){
 }
 
 function setRetrieval(index,length){
+    // RAG 이용시 활성화
     let html =`<div class="rag-text cursor-pointer" onclick="actDocs(`+index+`)">>관련 문서 (`+length+`)</div><div class="rag-result" style='display:none'></div>`;
-    $('#kout'+index).find('.retrieval-box').append(html);
+    // $('#kout'+index).find('.retrieval-box').append(html);
 }
 function actDocs(index){
     let selector = $('#kout'+index).find('.retrieval-box');
@@ -414,6 +414,7 @@ function submit(msg=''){
         'chat_history':[]
     }
     setLoader(order);
+    
 	$.ajax({
             type:"post",
              url:"/submit",
@@ -437,6 +438,59 @@ function submit(msg=''){
         }
     
     })
+}
+
+function streaming(msg=''){
+    if(prevent)
+        return;
+    prevent = true;
+    let text =msg; 
+    console.log(order)
+    if(msg =='')
+        text = $('#instruction').val();
+    $('#instruction').val('')
+
+    $('.chat').append(setInstruction(text,order));
+    $('.chat').append(setOutput(order));
+    $('.scroll-box').scrollTop($('.scroll-box')[0].scrollHeight);
+    // 아웃풋 연결 부분
+
+    let pd = {
+        'uid':uid,
+        'order':order,
+        'page':page,
+        'question':text,
+        'chat_history':[]
+    }
+    setLoader(order);
+    
+	$.ajax({
+            type:"post",
+             url:"/setprompt",
+             data:pd,
+	 	success:function(res){
+            if(res['status']==300){
+	 	        location.href = '/page/'+res['data'];
+            } else {
+                var eventSource = new EventSource("/stream/"+page);
+    
+                eventSource.onmessage = function (e) {
+                    $('.loader').css('display','none');
+                    if(e.data == '|end_text|'){
+                        eventSource.close()
+                        order++;
+                    }
+                    $('#kout'+order).find('p').append(e.data)
+                    // setRetrieval(order,res['docs'])
+                };
+            }
+
+        }
+    
+    })
+
+
+    
 }
 
 function setInstruction(msg,index){

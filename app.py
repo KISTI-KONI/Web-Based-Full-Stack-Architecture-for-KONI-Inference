@@ -2,9 +2,9 @@ import sys
 sys.path.append('./static/utils/')
 from utils import connect_db,connect_serverinfo,randomAscii
 
-from flask import Flask,request,render_template,redirect,url_for,session
+from flask import Flask,request,render_template,redirect,url_for,session,Response,stream_with_context
 from flask_cors import CORS
-import json,pymysql,datetime
+import json,pymysql,datetime,time
 from pytz import timezone
 from langserve import RemoteRunnable
 from langchain_core.documents import Document
@@ -118,6 +118,79 @@ def generateOutput(db,cursor,text,settings):
         output="예기치 못한 오류가 발생하였습니다. 새로고침하여 재실행해주세요."
         docscount='error'
     return output,docscount
+
+@app.route('/setprompt',methods=['POST'])
+def setprompt():
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+    )
+    req = request.form.to_dict()
+    cursor = db.cursor()
+    page_id = req['page']
+    now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+    newbie = False
+    if not page_id :
+        newbie = True
+        while 1 :
+            page_id = randomAscii()        
+            sql='select id from pages where id = %s'
+            cursor.execute(sql,page_id)
+            pid = cursor.rowcount
+            if pid != 0 :
+                continue
+            else :
+                break
+        sql='insert into pages set id = %s,uid = %s,created = %s,updated = %s'
+        cursor.execute(sql,(page_id,req['uid'],now,now))
+        db.commit()
+
+    text = req['question']
+    sql='insert into instructions set instruction=%s,uid = %s,pid=%s,iorder=%s,created = %s'
+    cursor.execute(sql,(text,req['uid'],page_id,req['order'],now))
+    db.commit()
+
+    myiid = cursor.lastrowid
+
+    db.commit()
+    
+    if newbie :
+        db.close()
+        return {'status':300,'data':page_id}
+
+    db.close()
+    return {'status':200}
+
+@app.get('/stream/<page_id>')
+def stream(page_id:str):
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    cursor = db.cursor()
+    sql = 'select instruction from instructions where pid = %s order by iorder desc limit 1'
+    cursor.execute(sql,(page_id))
+    fets = cursor.fetchone()
+    text = fets['instruction']
+    output=''
+    remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')                                                                                                                                                     
+    def streaming(page_id):
+        print(page_id+ " is start")
+        for p in  remote_runnable.stream({"query":text}):
+            yield f'data:{p}\n\n'
+            time.sleep(0.005)
+        print(page_id +" is end") 
+        yield("data:|end_text|\n\n")
+    return Response(streaming(page_id),content_type="text/event-stream")
 
 @app.route('/generate',methods=['POST'])
 def generate():
