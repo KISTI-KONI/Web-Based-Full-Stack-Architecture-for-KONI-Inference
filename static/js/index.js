@@ -80,7 +80,7 @@ $(document).ready(function(){
                     index++;
 		    
                 }
-                order = index-1;
+                order = index;
                 if(res['status'] == 'newbie'){
                     
                     $.ajax({
@@ -88,18 +88,17 @@ $(document).ready(function(){
                         url:"/generate",
                         data:{
                             'page':page,
-                            'index':order
+                            'index':order-1
                         },
                         success:function(res){
-                            console.log(res) 
                             $('.loader').css('display','none');
                             if(res[1] == 'error'){
                                 prevent = true;
-                                $('#kout'+order).find('p').append('<a href="javascript:location.reload()">'+res[0]+'</a>')
+                                $('#kout'+(order-1)).find('p').append('<a href="javascript:location.reload()">'+res[0]+'</a>')
                             }
                             else if(res[1] !='error'){
-                                textAnimation('#kout'+order,res[0]);
-                                setRetrieval(order,res[1])
+                                textAnimation('#kout'+(order-1),res[0]);
+                                setRetrieval(order-1,res[1])
 				            }
                         }
                     });
@@ -446,7 +445,6 @@ function streaming(msg=''){
         return;
     prevent = true;
     let text =msg; 
-    console.log(order)
     if(msg =='')
         text = $('#instruction').val();
     $('#instruction').val('')

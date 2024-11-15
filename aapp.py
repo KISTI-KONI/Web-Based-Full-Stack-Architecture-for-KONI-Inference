@@ -92,9 +92,16 @@ def generateOutput(db, cursor, text, settings):
     print(text)
     try:
         output = ''
-        remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
-        for p in remote_runnable.stream({'query':text}):
-            output = output + p
+        # remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
+        # for p in remote_runnable.stream({'query':text}):
+        #     output = output + p
+        output ='''
+        씨 한 두 주마등은 찾다. 20일 있어야 그런 피해가 현역의 물고기와 하는 허용되다. 갑작스럽고 인식시키면 둘러싸이는 귀중합니까 자칫하는데 수 것, 조용히, 표의 지키고 숱하지요. 내어 과제에, 이어지고 하청업이요 만드는 떨어지다 있은 제목에 것 그는 감사할까. 논평이나 하나의 교직부터 자신감보다 사회부터 있어 재연하여서 차지됩니다. 살 한편 일요일은 렌트를 않은가. 덜 딱 나중을, 몫을 끝나는 소쩍다 볼수록 해가 협박의 허공이 가다. 그 환경적이고 자리를, 전면의 인민이지 나에 사내다 2024년 관한데 테스트하라고. 
+
+요원의 인생과 자 허용하는 펴어 우주와 주기 되는 솜씨다 상징한 같을까. 종알거리고 일한 활엽수림을 초기가 괴물과 대응하다. 낭만에서 경우를 혁명에서 것, 외국인은 말하다. 농경지다 가면 기분은, 9일 논문은, 최고, 나면서, 개편으로 월동합니다. 여주인공으로 악독하여 젓가락만큼 지칭하여서 다양합시다, 악화되다. 벌써 지배에 그렇는데 달리라 같으라. 많는 제동을 안 위협하세요 국민이다 소문아 백사십은 시대와 있다 희다. 뒤와 지역으로, 본다 그런데 먼저 그렇어요 학교다, 하자 잠이랑 마련되다. 
+
+필요성을 값의 끝이 농업도 오고, 때가 호박고지를 바로 있고 사항의, 하다. 기자에 228평 그러나 다른 높이다. 흰색을 공비로써 본부가 오는데 셋이어 앞은 생깁니다. 무의 최고로 이후를 유망주의 만다 수출으로 계급을, 다르지요. 경치는 그 사원을 내어 하나. 비판이거든 그는 들기 방송의 맺어요. 자본주의만큼 따로 중 성립에서 속절없이 시사하는 대안의 누적을 육신에서 첨예하다. 얘기가 직위에게 익히어, 개념 배려와 그녀는 여성이, 가지니, 감시권에로 도망치다.
+        '''
         docs = []
         sql = 'insert into outputs set output = %s, uid = %s, pid = %s, iid = %s, created = %s'
         cursor.execute(sql, (output, settings[0], settings[1], settings[2], settings[3]))
@@ -148,16 +155,18 @@ async def stream(page_id: str):
     text = fet['instruction']
     async def streaming(settings):
         output = ''
-        remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
-        for p in  remote_runnable.stream({"query":text}):
+        output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
+        # remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
+        # for p in  remote_runnable.stream({"query":text}):
+        for p in output_list:
             output = output + p
             yield f'data: {p}\n\n'
             # await asyncio.sleep(0.1)
         yield 'data: |end_text|\n\n'
-                
+        print(settings)
         now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
         sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
-        cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['iid'],now))
+        cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['id'],now))
         oid = cursor.lastrowid
         sql='update pages set title=%s,updated = %s where id = %s'
         cursor.execute(sql,(output[0:31],now,settings[1]))
@@ -202,8 +211,6 @@ async def generate():
     )
     form = await request.form
     req = form.to_dict()
-    print(req)
-    print(type(req))
     cursor = db.cursor()
     page_id = req['page']
     iorder = req['index']
@@ -211,7 +218,6 @@ async def generate():
     cursor.execute(sql, (page_id, iorder))
     fets = cursor.fetchone()
     now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
-    print(fets)
     output, docs = generateOutput(db, cursor, str(fets['instruction']), [str(fets['uid']), page_id, str(fets['id']), now])
     return [output,docs]
 
@@ -296,7 +302,8 @@ async def submit():
         db=DB_INFO['db'],   
         charset=DB_INFO['charset'],
     )
-    req = await request.form
+    form = await request.form
+    req = form.to_dict()
     cursor = db.cursor()
     page_id = req['page']
     now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
@@ -325,7 +332,7 @@ async def submit():
         db.close()
         return {'status': 300, 'data': page_id}
 
-    output, docs = await generateOutput(db, cursor, req['question'], [req['uid'], page_id, myiid, now])
+    output, docs = generateOutput(db, cursor, req['question'], [req['uid'], page_id, myiid, now])
     db.close()
     return {'status': 200, 'data': output, 'docs': docs}
 
