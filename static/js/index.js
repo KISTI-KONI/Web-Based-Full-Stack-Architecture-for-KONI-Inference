@@ -78,8 +78,9 @@ $(document).ready(function(){
                         }
                     }
                     index++;
+		    
                 }
-                order = index;
+                order = index-1;
                 if(res['status'] == 'newbie'){
                     
                     $.ajax({
@@ -90,7 +91,7 @@ $(document).ready(function(){
                             'index':order
                         },
                         success:function(res){
-                            
+                            console.log(res) 
                             $('.loader').css('display','none');
                             if(res[1] == 'error'){
                                 prevent = true;

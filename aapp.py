@@ -1,6 +1,6 @@
 import sys
 import asyncio
-from quart import Quart, request, render_template, redirect, url_for, session, Response
+from quart import Quart, request, render_template, redirect, url_for, session, Response,stream_with_context
 from quart_cors import cors
 import json, pymysql, datetime, time
 from pytz import timezone
@@ -87,14 +87,15 @@ async def wru():
 
 API_SERVER = SERVER_INFO['API_SERVER']
 
-async def generateOutput(db, cursor, text, settings):
+def generateOutput(db, cursor, text, settings):
     headers = {'Content-Type': 'application/json; charset=utf-8'}
     print(text)
     try:
+        output = ''
+        remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
+        for p in remote_runnable.stream({'query':text}):
+            output = output + p
         docs = []
-        output = '''
-        예시 텍스트 입니다.
-        '''
         sql = 'insert into outputs set output = %s, uid = %s, pid = %s, iid = %s, created = %s'
         cursor.execute(sql, (output, settings[0], settings[1], settings[2], settings[3]))
         cursor.execute('update pages set title = %s, updated = %s where id = %s', (output[:31], settings[3], settings[1]))
@@ -142,17 +143,27 @@ async def stream(page_id: str):
         cursorclass=pymysql.cursors.DictCursor
     )
     cursor = db.cursor()
-    cursor.execute('select instruction from instructions where pid = %s order by iorder desc limit 1', (page_id))
-    text = cursor.fetchone()['instruction']
-    output = ''
-    remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
-    async def streaming():
+    cursor.execute('select id,uid,instruction from instructions where pid = %s order by iorder desc limit 1', (page_id))
+    fet = cursor.fetchone()
+    text = fet['instruction']
+    async def streaming(settings):
+        output = ''
+        remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
         for p in  remote_runnable.stream({"query":text}):
+            output = output + p
             yield f'data: {p}\n\n'
-            await asyncio.sleep(0.1)
+            # await asyncio.sleep(0.1)
         yield 'data: |end_text|\n\n'
+                
+        now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+        sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
+        cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['iid'],now))
+        oid = cursor.lastrowid
+        sql='update pages set title=%s,updated = %s where id = %s'
+        cursor.execute(sql,(output[0:31],now,settings[1]))
+        db.commit()
 
-    return Response(streaming(), content_type="text/event-stream")
+    return Response(streaming([fet,page_id]), content_type="text/event-stream")
 
 @app.route('/feedback', methods=['POST'])
 async def feedback():
@@ -187,8 +198,12 @@ async def generate():
         passwd=DB_INFO['passwd'],    
         db=DB_INFO['db'],   
         charset=DB_INFO['charset'],
+        cursorclass=pymysql.cursors.DictCursor
     )
-    req = await request.form
+    form = await request.form
+    req = form.to_dict()
+    print(req)
+    print(type(req))
     cursor = db.cursor()
     page_id = req['page']
     iorder = req['index']
@@ -196,9 +211,9 @@ async def generate():
     cursor.execute(sql, (page_id, iorder))
     fets = cursor.fetchone()
     now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
-    
-    output, docs = await generateOutput(db, cursor, str(fets[2]), [str(fets[1]), page_id, str(fets[0]), now])
-    return {'output': output, 'docs': docs}
+    print(fets)
+    output, docs = generateOutput(db, cursor, str(fets['instruction']), [str(fets['uid']), page_id, str(fets['id']), now])
+    return [output,docs]
 
 @app.route('/get_docs', methods=['POST'])
 async def getDocs():
@@ -209,6 +224,7 @@ async def getDocs():
         passwd=DB_INFO['passwd'],    
         db=DB_INFO['db'],   
         charset=DB_INFO['charset'],
+        cursorclass=pymysql.cursors.DictCursor
     )
     req = await request.form
     cursor = db.cursor()
@@ -217,7 +233,8 @@ async def getDocs():
     sql = 'select b.id from instructions a left join outputs b on a.id = b.iid where a.pid = %s and a.iorder = %s'
     cursor.execute(sql, (page_id, iorder))
     fets = cursor.fetchone()
-    oid = fets[0]
+    oid = fets['id']
+    print(oid)
     sql = 'select contents, field, filename, page from docs where oid = %s'
     cursor.execute(sql, oid)
     fets = cursor.fetchall()
@@ -313,4 +330,4 @@ async def submit():
     return {'status': 200, 'data': output, 'docs': docs}
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=3457)
+    app.run(host='0.0.0.0', port=3456)
