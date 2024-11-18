@@ -121,6 +121,42 @@ def generateOutput(db, cursor, text, settings):
         docs = 'error'
     return output, docs
 
+async def streaming(text,settings):
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    cursor = db.cursor()
+    print(text)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(API_SERVER+'/multiturn',json={'query':text,'session_id':page_id}) as resp:
+            output = ''
+            if SERVER_INFO['STATUS'] == 'test':
+                output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
+                for p in output_list:
+                    output = output + p
+                    yield f'data: {p}\n\n'
+                    await asyncio.sleep(1)
+            elif SERVER_INFO['STATUS'] == 'deploy':
+                output = ''
+                async for l in resp.content:
+                    output = output + l.decode('utf-8').strip()
+                    yield f'data:{output}\n\n'
+                print(output)
+                yield 'data: |end_text|\n\n'
+            now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+            sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
+            cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['id'],now))
+            oid = cursor.lastrowid
+            sql='update pages set title=%s,updated = %s where id = %s'
+            cursor.execute(sql,(output[0:31],now,settings[1]))
+            db.commit()
+
 @app.route('/setprompt', methods=['POST'])
 async def setprompt():
     db = pymysql.connect(
@@ -147,54 +183,14 @@ async def setprompt():
     db.close()
     return {'status': 200}
 
+
+
 @app.get('/stream/<page_id>')
 async def stream(page_id: str):
-    db = pymysql.connect(
-        host=DB_INFO['host'],     
-        port=DB_INFO['port'],     
-        user=DB_INFO['user'],      
-        passwd=DB_INFO['passwd'],    
-        db=DB_INFO['db'],   
-        charset=DB_INFO['charset'],
-        cursorclass=pymysql.cursors.DictCursor
-    )
-    cursor = db.cursor()
     cursor.execute('select id,uid,instruction from instructions where pid = %s order by iorder desc limit 1', (page_id))
     fet = cursor.fetchone()
     text = fet['instruction']
-    print(text)
-    async def streaming(settings):
-        async with aiohttp.ClientSession() as session:
-            async with session.post(API_SERVER+'/multiturn',json={'query':text,'session_id':page_id}) as resp:
-                output = ''
-                if SERVER_INFO['STATUS'] == 'test':
-                    output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
-                    for p in output_list:
-                        output = output + p
-                        yield f'data: {p}\n\n'
-                        await asyncio.sleep(1)
-                elif SERVER_INFO['STATUS'] == 'deploy':
-                    output = ''
-                    async for l in resp.content:
-                        output = output + l.decode('utf-8').strip()
-                        yield f'data:{output}\n\n'
-                    print(output)
-                        #print(l)
-                        #yield f'data:{l}\n\n'
-                    #remote_runnable = RemoteRunnable(API_SERVER+'/multiturn')
-                    #for p in  remote_runnable.stream({"query":text,'session_id':settings[1]}):
-                    #    print(p,end='')
-                    #    output = output + p
-                    #    yield f'data: {p}\n\n'
-                    yield 'data: |end_text|\n\n'
-                now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
-                sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
-                cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['id'],now))
-                oid = cursor.lastrowid
-                sql='update pages set title=%s,updated = %s where id = %s'
-                cursor.execute(sql,(output[0:31],now,settings[1]))
-                db.commit()
-    return Response(streaming([fet,page_id]),content_type="text/event-stream")
+    return Response(streaming(text,[fet,page_id]),content_type="text/event-stream")
 
 @app.route('/feedback', methods=['POST'])
 async def feedback():
@@ -240,7 +236,7 @@ async def generate():
     cursor.execute(sql, (page_id, iorder))
     fets = cursor.fetchone()
     now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
-    output, docs = generateOutput(db, cursor, str(fets['instruction']), [str(fets['uid']), page_id, str(fets['id']), now])
+    output, docs = streaming(str(fets['instruction']), [str(fets['uid']), page_id, str(fets['id']), now])
     return [output,docs]
 
 @app.route('/get_docs', methods=['POST'])
@@ -354,7 +350,7 @@ async def submit():
         db.close()
         return {'status': 300, 'data': page_id}
 
-    output, docs = generateOutput(db, cursor, req['question'], [req['uid'], page_id, myiid, now])
+    output, docs = streaming(req['question'], [req['uid'], page_id, myiid, now])
     db.close()
     return {'status': 200, 'data': output, 'docs': docs}
 
