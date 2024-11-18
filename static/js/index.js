@@ -468,12 +468,13 @@ function streaming(msg=''){
              url:"/setprompt",
              data:pd,
 	 	success:function(res){
-            if(res['status']==300){
+           if(res['status']==300){
 	 	        location.href = '/page/'+res['data'];
             } else {
                 var eventSource = new EventSource("/stream/"+page);
     
                 eventSource.onmessage = function (e) {
+			console.log(e.data)
                     $('.loader').css('display','none');
                     if(e.data == '|end_text|'){
                         eventSource.close()

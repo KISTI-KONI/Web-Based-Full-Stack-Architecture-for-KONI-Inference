@@ -6,7 +6,7 @@ import json, pymysql, datetime, time
 from pytz import timezone
 from langserve import RemoteRunnable
 from langchain_core.documents import Document
-
+import aiohttp
 sys.path.append('./static/utils/')
 from utils import connect_db, connect_serverinfo, randomAscii
 
@@ -93,10 +93,15 @@ def generateOutput(db, cursor, text, settings):
     try:
         output = ''
         if SERVER_INFO['STATUS'] == 'deploy':
-            remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
-            for p in remote_runnable.stream({'query':text}):
-                output = output + p
-        print(p)
+            response = request(API_SERVER+'/multiturn/stream',{'query':text,'session_id':settings[1]});
+            print(response)
+            #remote_runnable = RemoteRunnable(API_SERVER+'/multiturn')
+            #for p in remote_runnable.stream({'query':text,'session_id':settings[1]}):
+            #    print(p)
+            #    output = output + p
+            #print(output)
+            #if not output :
+            #    output = 'KONI가 말을 잇지 못합니다.'
         elif SERVER_INFO['STATUS'] == 'test':
             output ='''
             씨 한 두 주마등은 찾다. 20일 있어야 그런 피해가 현역의 물고기와 하는 허용되다. 갑작스럽고 인식시키면 둘러싸이는 귀중합니까 자칫하는데 수 것, 조용히, 표의 지키고 숱하지요. 내어 과제에, 이어지고 하청업이요 만드는 떨어지다 있은 제목에 것 그는 감사할까. 논평이나 하나의 교직부터 자신감보다 사회부터 있어 재연하여서 차지됩니다. 살 한편 일요일은 렌트를 않은가. 덜 딱 나중을, 몫을 끝나는 소쩍다 볼수록 해가 협박의 허공이 가다. 그 환경적이고 자리를, 전면의 인민이지 나에 사내다 2024년 관한데 테스트하라고. 
@@ -110,7 +115,8 @@ def generateOutput(db, cursor, text, settings):
         cursor.execute(sql, (output, settings[0], settings[1], settings[2], settings[3]))
         cursor.execute('update pages set title = %s, updated = %s where id = %s', (output[:31], settings[3], settings[1]))
         db.commit()
-    except Exception:
+    except Exception as e:
+        print(e)
         output = "예기치 못한 오류가 발생하였습니다. 새로고침하여 재실행해주세요."
         docs = 'error'
     return output, docs
@@ -158,28 +164,37 @@ async def stream(page_id: str):
     text = fet['instruction']
     print(text)
     async def streaming(settings):
-        output = ''
-        if SERVER_INFO['STATUS'] == 'test':
-            output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
-            for p in output_list:
-                output = output + p
-                yield f'data: {p}\n\n'
-                await asyncio.sleep(1)
-        elif SERVER_INFO['STATUS'] == 'deploy':
-            remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')
-            for p in  remote_runnable.stream({"query":text}):
-                output = output + p
-                yield f'data: {p}\n\n'
-        yield 'data: |end_text|\n\n'
-        now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
-        sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
-        cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['id'],now))
-        oid = cursor.lastrowid
-        sql='update pages set title=%s,updated = %s where id = %s'
-        cursor.execute(sql,(output[0:31],now,settings[1]))
-        db.commit()
-
-    return Response(streaming([fet,page_id]), content_type="text/event-stream")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(API_SERVER+'/multiturn',json={'query':text,'session_id':page_id}) as resp:
+                output = ''
+                if SERVER_INFO['STATUS'] == 'test':
+                    output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
+                    for p in output_list:
+                        output = output + p
+                        yield f'data: {p}\n\n'
+                        await asyncio.sleep(1)
+                elif SERVER_INFO['STATUS'] == 'deploy':
+                    output = ''
+                    async for l in resp.content:
+                        output = output + l.decode('utf-8').strip()
+                        yield f'data:{output}\n\n'
+                    print(output)
+                        #print(l)
+                        #yield f'data:{l}\n\n'
+                    #remote_runnable = RemoteRunnable(API_SERVER+'/multiturn')
+                    #for p in  remote_runnable.stream({"query":text,'session_id':settings[1]}):
+                    #    print(p,end='')
+                    #    output = output + p
+                    #    yield f'data: {p}\n\n'
+                    yield 'data: |end_text|\n\n'
+                now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+                sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
+                cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['id'],now))
+                oid = cursor.lastrowid
+                sql='update pages set title=%s,updated = %s where id = %s'
+                cursor.execute(sql,(output[0:31],now,settings[1]))
+                db.commit()
+    return Response(streaming([fet,page_id]),content_type="text/event-stream")
 
 @app.route('/feedback', methods=['POST'])
 async def feedback():
