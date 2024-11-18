@@ -133,29 +133,31 @@ async def streaming(text,settings):
     )
     cursor = db.cursor()
     print(text)
-    async with aiohttp.ClientSession() as session:
-        async with session.post(API_SERVER+'/multiturn',json={'query':text,'session_id':page_id}) as resp:
-            output = ''
-            if SERVER_INFO['STATUS'] == 'test':
-                output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
-                for p in output_list:
-                    output = output + p
-                    yield f'data: {p}\n\n'
-                    await asyncio.sleep(1)
-            elif SERVER_INFO['STATUS'] == 'deploy':
+    if SERVER_INFO['STATUS'] == 'test':
+        output = ''
+        output_list = ['안녕하세요.','궁금한게 있따면','저에게 물어','보세요','!']
+        for p in output_list:
+            output = output + p
+            yield f'data: {p}\n\n'
+            await asyncio.sleep(1)
+        print(output)
+        yield 'data: |end_text|\n\n'
+    elif SERVER_INFO['STATUS'] == 'deploy':
+        async with aiohttp.ClientSession() as session:
+            async with session.post(API_SERVER+'/multiturn',json={'query':text,'session_id':page_id}) as resp:
                 output = ''
                 async for l in resp.content:
                     output = output + l.decode('utf-8').strip()
                     yield f'data:{output}\n\n'
                 print(output)
                 yield 'data: |end_text|\n\n'
-            now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
-            sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
-            cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['id'],now))
-            oid = cursor.lastrowid
-            sql='update pages set title=%s,updated = %s where id = %s'
-            cursor.execute(sql,(output[0:31],now,settings[1]))
-            db.commit()
+    now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+    sql='insert into outputs set output=%s,uid = %s,pid=%s,iid=%s,created = %s'
+    cursor.execute(sql,(output,settings[0]['uid'],settings[1],settings[0]['id'],now))
+    oid = cursor.lastrowid
+    sql='update pages set title=%s,updated = %s where id = %s'
+    cursor.execute(sql,(output[0:31],now,settings[1]))
+    db.commit()
 
 @app.route('/setprompt', methods=['POST'])
 async def setprompt():
@@ -183,10 +185,40 @@ async def setprompt():
     db.close()
     return {'status': 200}
 
+@app.get('/whyso')
+async def whyso():
+    def tester():
+        print('test start')
+        from openai import OpenAI
+        client = OpenAI(
+            base_url="http://150.183.252.90:8888/v1",
+            api_key="token-abc123",
+        )
+        stream = client.chat.completions.create(
+            model="koni",
+            messages=[{"role": "user", "content": "KISTI는 뭐하는 곳이야?"}],
+            stream=True,
+        )
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                print(chunk.choices[0].delta.content, end="")
+            yield f'data:{chunk}\n\n'
+        yield 'data: |end_text|\n\n'
+    return Response(tester(),content_type="text/event-stream")
 
 
 @app.get('/stream/<page_id>')
 async def stream(page_id: str):
+    db = pymysql.connect(
+        host=DB_INFO['host'],     
+        port=DB_INFO['port'],     
+        user=DB_INFO['user'],      
+        passwd=DB_INFO['passwd'],    
+        db=DB_INFO['db'],   
+        charset=DB_INFO['charset'],
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    cursor = db.cursor()
     cursor.execute('select id,uid,instruction from instructions where pid = %s order by iorder desc limit 1', (page_id))
     fet = cursor.fetchone()
     text = fet['instruction']
@@ -235,9 +267,8 @@ async def generate():
     sql = 'select id, uid, instruction from instructions where pid = %s and iorder = %s'
     cursor.execute(sql, (page_id, iorder))
     fets = cursor.fetchone()
-    now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
-    output, docs = streaming(str(fets['instruction']), [str(fets['uid']), page_id, str(fets['id']), now])
-    return [output,docs]
+    return Response(streaming(str(fets['instruction']), [fets,page_id]),content_type="text/event-stream")
+   
 
 @app.route('/get_docs', methods=['POST'])
 async def getDocs():

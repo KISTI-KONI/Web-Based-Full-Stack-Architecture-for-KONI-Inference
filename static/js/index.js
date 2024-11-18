@@ -81,8 +81,8 @@ $(document).ready(function(){
 		    
                 }
                 order = index;
+                console.log(order)
                 if(res['status'] == 'newbie'){
-                    
                     $.ajax({
                         type:"post",
                         url:"/generate",
@@ -97,8 +97,19 @@ $(document).ready(function(){
                                 $('#kout'+(order-1)).find('p').append('<a href="javascript:location.reload()">'+res[0]+'</a>')
                             }
                             else if(res[1] !='error'){
-                                textAnimation('#kout'+(order-1),res[0]);
-                                setRetrieval(order-1,res[1])
+                                var eventSource = new EventSource("/stream/"+page);
+    
+                                eventSource.onmessage = function (e) {
+                                    console.log(e.data)
+                                    $('.loader').css('display','none');
+                                    if(e.data == '|end_text|'){
+                                        eventSource.close()
+                                        prevent = false;
+                                    }
+                                    
+                                    $('#kout'+order-1).find('p').append(e.data)
+                                    // setRetrieval(order,res['docs'])
+                                };
 				            }
                         }
                     });
@@ -157,6 +168,21 @@ $(document).ready(function(){
     $('.new-btn').click(function(){
         location.href='/home';
     });
+
+    $('.test1').click(function(){
+        var eventSource = new EventSource("/whyso");
+    
+        eventSource.onmessage = function (e) {
+            console.log(e.data)
+            $('.loader').css('display','none');
+            if(e.data == '|end_text|'){
+                eventSource.close()
+                prevent = false;
+            }
+            // setRetrieval(order,res['docs'])
+        };
+    });
+
 
 })
 function setLoader(index){
@@ -474,10 +500,11 @@ function streaming(msg=''){
                 var eventSource = new EventSource("/stream/"+page);
     
                 eventSource.onmessage = function (e) {
-			console.log(e.data)
+                    console.log(e.data)
                     $('.loader').css('display','none');
                     if(e.data == '|end_text|'){
                         eventSource.close()
+                        prevent = false;
                         order++;
                     }
                     $('#kout'+order).find('p').append(e.data)
