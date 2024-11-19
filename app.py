@@ -4,7 +4,7 @@ from utils import connect_db,connect_serverinfo,randomAscii
 
 from flask import Flask,request,render_template,redirect,url_for,session
 from flask_cors import CORS
-import json,pymysql,datetime,time
+import json,pymysql,datetime,time,requests
 from pytz import timezone
 from langserve import RemoteRunnable
 app = Flask(__name__)
@@ -95,9 +95,13 @@ def generateOutput(db,cursor,text,settings):
     print(text)
     docscount = 0
     try:
-        if SERVER_INFO['STATUS'] == 'deploy':                                                                                                                                                                                            
-            remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')                                                                                                                                                     
-            output = remote_runnable.invoke({"question":text,"session_id":settings[1]})                                                                                                                                          
+        if SERVER_INFO['STATUS'] == 'deploy':
+            response = requests.post(f"{API_SERVER}/multiturn",json={'query': text, 'session_id': settings[1]})
+            output = ''
+            response.encoding = 'utf-8'
+            output = response.text
+            #remote_runnable = RemoteRunnable(API_SERVER+'/singleturn')                                                                                                                                                     
+            #output = remote_runnable.invoke({"question":text,"session_id":settings[1]})                                                                                                                                          
             docs=[]
         elif SERVER_INFO['STATUS'] == 'test':
             output ='''
@@ -114,7 +118,8 @@ def generateOutput(db,cursor,text,settings):
         sql='update pages set title=%s,updated = %s where id = %s'
         cursor.execute(sql,(output[0:31],settings[3],settings[1]))
         db.commit()
-    except:
+    except Exception as e:
+        print(e)
         output="예기치 못한 오류가 발생하였습니다. 새로고침하여 재실행해주세요."
         docscount='error'
     return output,docscount
