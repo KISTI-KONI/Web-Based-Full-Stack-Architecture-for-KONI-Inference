@@ -97,19 +97,10 @@ $(document).ready(function(){
                                 $('#kout'+(order-1)).find('p').append('<a href="javascript:location.reload()">'+res[0]+'</a>')
                             }
                             else if(res[1] !='error'){
-                                var eventSource = new EventSource("/stream/"+page);
-    
-                                eventSource.onmessage = function (e) {
-                                    console.log(e.data)
-                                    $('.loader').css('display','none');
-                                    if(e.data == '|end_text|'){
-                                        eventSource.close()
-                                        prevent = false;
-                                    }
-                                    
-                                    $('#kout'+order-1).find('p').append(e.data)
-                                    // setRetrieval(order,res['docs'])
-                                };
+
+                                textAnimation('#kout'+(order-1),res[0]);
+                                setRetrieval(order-1,res[1])
+                                order++;
 				            }
                         }
                     });
@@ -147,7 +138,7 @@ $(document).ready(function(){
     })
 
     $('.btn-chat-info').click(function(e){
-        streaming();
+        submit();
     })
 
     $('.closed').click(()=>{
@@ -168,25 +159,6 @@ $(document).ready(function(){
     $('.new-btn').click(function(){
         location.href='/home';
     });
-
-    $('.test1').click(function(){
-	console.log('testtest')
-        var eventSource = new EventSource("/whyso");
-    
-        eventSource.onmessage = function (e) {
-            console.log(e.data)
-            $('.loader').css('display','none');
-            if(e.data == '|end_text|'){
-                eventSource.close()
-                prevent = false;
-            }
-            // setRetrieval(order,res['docs'])
-        };
-	 eventSource.addEventListener("update", (e) => {
-		   console.log(e.data);
-		         });
-    });
-
 
 })
 function setLoader(index){
@@ -597,7 +569,7 @@ var idx = 0
 var intervId;
 async function textAnimation(tag,text){
     text = text.replaceAll('\n','<br>');       
-    intervId = setInterval(typing,10,tag,text);
+    intervId = setInterval(typing,5,tag,text);
 }
 
 function typing(tag,text){

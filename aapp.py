@@ -187,29 +187,6 @@ async def setprompt():
     db.close()
     return {'status': 200}
 
-@app.get('/whyso')
-async def whyso():
-    def tester():
-        print('test start')
-        yield "data: connection established\n\n"
-        from openai import OpenAI
-        client = OpenAI(
-            base_url="http://150.183.252.90:8888/v1",
-            api_key="token-abc123",
-        )
-        stream = client.chat.completions.create(
-            model="koni",
-            messages=[{"role": "user", "content": "KISTI는 뭐하는 곳이야?"}],
-            stream=True,
-        )
-        for chunk in stream:
-            if chunk.choices[0].delta.content is not None:
-                #print(chunk.choices[0].delta.content, end="")
-                yield f'update/data:{chunk.choices[0].delta.content}\n\n'
-        yield 'data: |end_text|\n\n'
-    return Response(tester(),content_type="text/event-stream")
-
-
 @app.get('/stream/<page_id>')
 async def stream(page_id: str):
     db = pymysql.connect(
