@@ -132,6 +132,7 @@ async def streaming(text,settings):
         cursorclass=pymysql.cursors.DictCursor
     )
     cursor = db.cursor()
+    page_id = settings[1]
     print(text)
     if SERVER_INFO['STATUS'] == 'test':
         output = ''
@@ -147,8 +148,9 @@ async def streaming(text,settings):
             async with session.post(API_SERVER+'/multiturn',json={'query':text,'session_id':page_id}) as resp:
                 output = ''
                 async for l in resp.content:
+                    print(l.decode('utf-8').strip())
                     output = output + l.decode('utf-8').strip()
-                    yield f'data:{output}\n\n'
+                    yield f'data:{l.decode("utf-8").strip()}\n\n'
                 print(output)
                 yield 'data: |end_text|\n\n'
     now = datetime.datetime.now(timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
@@ -189,6 +191,7 @@ async def setprompt():
 async def whyso():
     def tester():
         print('test start')
+        yield "data: connection established\n\n"
         from openai import OpenAI
         client = OpenAI(
             base_url="http://150.183.252.90:8888/v1",
@@ -201,8 +204,8 @@ async def whyso():
         )
         for chunk in stream:
             if chunk.choices[0].delta.content is not None:
-                print(chunk.choices[0].delta.content, end="")
-            yield f'data:{chunk}\n\n'
+                #print(chunk.choices[0].delta.content, end="")
+                yield f'update/data:{chunk.choices[0].delta.content}\n\n'
         yield 'data: |end_text|\n\n'
     return Response(tester(),content_type="text/event-stream")
 

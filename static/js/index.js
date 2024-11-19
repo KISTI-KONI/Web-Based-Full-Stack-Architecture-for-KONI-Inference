@@ -170,6 +170,7 @@ $(document).ready(function(){
     });
 
     $('.test1').click(function(){
+	console.log('testtest')
         var eventSource = new EventSource("/whyso");
     
         eventSource.onmessage = function (e) {
@@ -181,6 +182,9 @@ $(document).ready(function(){
             }
             // setRetrieval(order,res['docs'])
         };
+	 eventSource.addEventListener("update", (e) => {
+		   console.log(e.data);
+		         });
     });
 
 
