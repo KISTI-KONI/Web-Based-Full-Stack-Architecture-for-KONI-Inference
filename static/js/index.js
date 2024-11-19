@@ -439,7 +439,7 @@ function submit(msg=''){
 			$('#kout'+order).find('p').append('<a href="javascript:location.reload()">'+res['data']+'</a>')
 		}
 		else if(res['docs'] !='error'){
-
+            $('#instruction').css('overflow-y','hidden')
 			textAnimation('#kout'+order,res['data']);
             setRetrieval(order,res['docs'])
             order++;
