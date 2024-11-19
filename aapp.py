@@ -93,7 +93,7 @@ def generateOutput(db, cursor, text, settings):
     try:
         output = ''
         if SERVER_INFO['STATUS'] == 'deploy':
-            response = request(API_SERVER+'/multiturn/stream',{'query':text,'session_id':settings[1]});
+            response = request(API_SERVER+'/multiturn/stream',{'query':text,'session_id':settings[1]})
             print(response)
             #remote_runnable = RemoteRunnable(API_SERVER+'/multiturn')
             #for p in remote_runnable.stream({'query':text,'session_id':settings[1]}):

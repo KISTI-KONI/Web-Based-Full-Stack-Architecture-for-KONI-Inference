@@ -10,7 +10,9 @@ from langserve import RemoteRunnable
 app = Flask(__name__)
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
-app.secret_key = 'kisti-koni-largescaleairesearchgroup'
+app.secret_key = 'kisti-koni-my-little-koni'
+app.config['SESSION_COOKIE_NAME'] = 'koni-cookie'
+app.config['SESSION_COOKIE_DOMAIN'] = None
 DB_INFO = connect_db()
 SERVER_INFO = connect_serverinfo()
 
@@ -28,12 +30,41 @@ def admin():
 
 @app.route('/home',methods=['GET'])
 def home():
-    return render_template('index.html')
+    if 'userid' in session:
+        if session['userid'] == 'beta':
+            return render_template('index.html')
+    return render_template('main_login.html')
+    
 
 @app.route('/page/<pid>',methods=['GET','POST'])
 def page(pid):  
-    return render_template('index.html')
+    if 'userid' in session:
+        if session['userid'] == 'beta':
+            return render_template('index.html')
+    return render_template('main_login.html')
+
+@app.route('/login',methods=['POST'])
+def login():
+    req = request.form.to_dict()
+    stat = '400'
+    if req['id'] != 'koni':
+        print('login failed')
+    elif req['password'] != 'goni123':
+        print('login failed')
+    else:
+        print('login success!Ss')
+        session['userid'] = 'beta'
+        stat ='200'
+    return stat
+
+@app.route('/logout',methods=['POST'])
+def logout():
+    session.pop('userid', None)
+    return  ''
+
     
+### API ###
+
 @app.route('/init',methods=['POST'])
 def wru():
     db = pymysql.connect(
@@ -50,6 +81,8 @@ def wru():
     if not ip:
         ip = '127.0.0.1'
     print(ip)
+    if 'userid' in session and session['userid'] == 'beta':
+        ip = 'beta'
     sql='select id from user where ip = %s'
     cursor.execute(sql,ip)
     uid = cursor.rowcount
@@ -85,8 +118,6 @@ def wru():
             res.append(tmp)
     db.close()
     return {'side':res,'uid':myid}
-
-### API ###
 
 API_SERVER = SERVER_INFO['API_SERVER']
 WAS_SERVER = SERVER_INFO['WAS_SERVER']

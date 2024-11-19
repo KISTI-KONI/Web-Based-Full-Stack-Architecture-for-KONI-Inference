@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/static/img/favicon.ico">
+
+    <title>KONI Login</title>
+    <!-- <link rel="stylesheet" href="{{url_for('static',filename='style/toastr.min.css')}}"> -->
+
+    <script src="{{url_for('static',filename='js/jquery.js')}}"></script>
+    <!-- <script src="{{url_for('static',filename='js/toastr.min.js')}}"></script> -->
+
+</head>
+
+<body>
+    <div class="container">
+        <div class="init-box">
+            <div class="init-logo">
+                <div class="w-150 icon ">
+                    <img src="/static/img/koni.jpg" alt="">
+                </div>
+            </div>
+        </div>        
+        <div class="login-box">
+            <div class="input-box">
+                <label for="id">ID</label>
+                <input type="text" id="id">
+            </div>
+            <div class="input-box">
+                <label for="password">PW</label>
+                <input type="password" id="password">
+            </div>
+            <div class="confirm">
+                Login
+            </div>
+        </div>
+    </div>
+</body>
+<style>
+    .init-logo{
+        display: flex;
+        justify-content: center;
+    }
+    .icon{
+        overflow: hidden;
+        border-radius: 50%;
+        border:3px solid #83cdff;
+        padding:6px;
+        width:150px;
+        aspect-ratio: 1 / 1; 
+        background: white;
+        margin-right: 1rem;
+    }
+    .icon img {
+        width :100%
+    }
+    body{
+        margin:0;
+    }
+    .container{
+        width: 100vw;
+        height: 100vh;
+        padding : 25% 0;
+    }
+    .login-box{
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 560px;
+        margin:0 auto;
+        padding: 10px 100px;
+        box-sizing: border-box;
+    }
+    .login-box div{
+        height:50px;
+    }
+    .input-box{
+        margin-bottom:5px;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+    }
+    .confirm {
+        display: block;
+        width:100%;
+        border:1px solid #83cdff;
+        background: #83cdff;
+        text-decoration: none;
+        color: aliceblue;
+        padding: 20px;
+        cursor: pointer;
+        text-align: center;
+        font-size: 25px;
+    }
+</style>
+<script>
+    $(document).ready(function(){
+        $('#password').keydown(function(e){
+            if(e.which === 13 && !e.shiftKey) {
+                let pd = {
+                    'id': $('#id').val(),
+                    'password':$('#password').val()
+                }
+                $.ajax({
+                    type:'post',
+                    url:'/login',
+                    data:pd,
+                    success:function(res){
+                        console.log(res)
+                        if(res == '200')
+                            location.reload();
+                        else
+                            alert('로그인실패')
+                            // toastr.error('Failed to login.')
+                    }
+                })
+            }
+        })
+        $('.confirm').click(function(){
+            let pd = {
+                'id': $('#id').val(),
+                'password':$('#password').val()
+            }
+            $.ajax({
+                type:'post',
+                url:'/login',
+                data:pd,
+                success:function(res){
+                    console.log(res)
+                    if(res == '200')
+                        location.reload();
+                    else
+                        alert('로그인실패')
+                        // toastr.error('Failed to login.')
+                }
+            })
+        })
+    })
+</script>
+</html>

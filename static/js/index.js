@@ -160,6 +160,15 @@ $(document).ready(function(){
         location.href='/home';
     });
 
+    $('.notice').click(function(){
+        $.ajax({
+            type:"post",
+            url:"/logout",
+            success:function(res){
+                location.reload();
+            }
+        })
+    })
 })
 function setLoader(index){
     let html = `<div class="loader"></div>`;
@@ -390,7 +399,7 @@ function chatboxControl(sel){
 function comment(index){
     const comment = $('#kout'+index).find('.comment-container').find('textarea').val();
     feedback(index,-99,comment);
-    toastr.success('코멘트가 정상적으로 작성되었습니다.')
+    alert('코멘트가 정상적으로 작성되었습니다.')
 }
 
 function submit(msg=''){
