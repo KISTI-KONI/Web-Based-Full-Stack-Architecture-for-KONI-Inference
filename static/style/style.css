@@ -49,15 +49,20 @@ textarea::placeholder{
     margin-bottom: 50px;
 }
 .nav{
-    max-height: calc(100%-82px);
-    margin:0 auto;
-    overflow-x: hidden;
-    overflow-y: hidden;
+    height:80vh;
+    overflow-y: scroll;
 }
-.nav-box{
-    display: flex;
-    flex-direction: column;
-    text-overflow:initial;
+.nav::-webkit-scrollbar{
+    position: relative;
+    right: 0;
+    width:10px;
+}
+.nav::-webkit-scrollbar-thumb{
+    border-radius: 6px;
+    background: rgb(133, 133, 133);
+}
+.nav::-webkit-scrollbar-track{
+    background: #f1f1f1;
 }
 .nav-date{
     
@@ -65,7 +70,7 @@ textarea::placeholder{
     font-size: 12px;
     font-weight: bold;
     margin : 10px;
-    margin-top:25px;
+    margin-top:0px;
 }
 .title{
     margin-bottom: 3px;
