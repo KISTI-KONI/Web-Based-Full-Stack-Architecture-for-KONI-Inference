@@ -172,6 +172,7 @@ textarea::placeholder{
     height:170px;
     border:1px solid #83cdff;
     border-radius: 10%;
+    
 }
 .init-ex:hover{
     background: #83cdff;
@@ -179,11 +180,16 @@ textarea::placeholder{
 }
 .init-ex-logo{
     font-size: 17px;
-    margin-bottom: 5px;
+    margin-bottom: 15px;
 }
 .init-ex-text{
     font-size: 15px;
     color:#222;
+    overflow:hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
 }
 .chat {
     display: flex;
