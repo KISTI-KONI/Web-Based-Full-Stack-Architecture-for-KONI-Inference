@@ -48,6 +48,17 @@ textarea::placeholder{
     height:32px;
     margin-bottom: 50px;
 }
+.nav{
+    max-height: calc(100%-82px);
+    margin:0 auto;
+    overflow-x: hidden;
+    overflow-y: hidden;
+}
+.nav-box{
+    display: flex;
+    flex-direction: column;
+    text-overflow:initial;
+}
 .nav-date{
     
     color:#222;
@@ -57,7 +68,7 @@ textarea::placeholder{
     margin-top:25px;
 }
 .title{
-    margin:10px;
+    margin-bottom: 3px;
     width: 100%;
     white-space:nowrap;
     overflow: hidden;
